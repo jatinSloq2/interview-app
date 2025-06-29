@@ -11,10 +11,8 @@ import { Button } from "@/components/ui/button";
 import {
     Form,
 } from "@/components/ui/form";
-import { auth } from "@/firebase/client";
-import { signIn, signup } from "@/lib/actions/auth.actions";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import FormField from "./FormFeild";
+import { api } from "@/lib/axiox";
 
 
 
@@ -42,54 +40,24 @@ const AuthForm = ({ type }: { type: FormType }) => {
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         try {
             if (type === "sign-up") {
-                const { name, email, password } = values
-                const userCredential = createUserWithEmailAndPassword(auth, email, password)
-                const result = await signup({
-                    uid: (await userCredential).user.uid,
-                    name: name!,
-                    email,
-                    password,
-                });
-
-                if (!result.success) {
-                    toast.error(result.message);
-                    return;
-                }
-
+                const res = await api.post("/auth/sign-up", values);
                 toast.success("Account created successfully. Please sign in.");
                 router.push("/sign-in");
-                console.log("Sign Up", values)
             } else {
-                const { email, password } = values;
-
-                const userCredential = await signInWithEmailAndPassword(
-                    auth,
-                    email,
-                    password
-                );
-
-                const idToken = await userCredential.user.getIdToken();
-                if (!idToken) {
-                    toast.error("Sign in Failed. Please try again.");
-                    return;
-                }
-
-                await signIn({
-                    email,
-                    idToken,
+                const res = await api.post("/auth/sign-in", {
+                    email: values.email,
+                    password: values.password,
                 });
-
                 toast.success("Signed in successfully.");
                 router.push("/");
-
-
             }
-
-        } catch (error) {
-            console.log(error)
-            toast.error(`There was an error ${error}`)
+        } catch (error: any) {
+            const message =
+                error?.response?.data?.error || error.message || "Something went wrong";
+            console.error("Auth error:", message);
+            toast.error(message);
         }
-    }
+    };
 
     const isSignIn = type === "sign-in"
     return (
