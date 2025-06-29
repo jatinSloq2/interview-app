@@ -1,30 +1,41 @@
-import { db } from "@/lib/db";
-import { NextResponse } from "next/server";
+import { connectDB } from "@/lib/mongoDb";
+import { User } from "@/models/user";
 import bcrypt from "bcryptjs";
+import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
     const { name, email, password } = await req.json();
 
-    if (!name || !email || !password)
+    if (!name || !email || !password) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    }
 
-    // check if email already exists
-    const [rows] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
-    if ((rows as any[]).length > 0)
-      return NextResponse.json({ error: "Email already registered" }, { status: 409 });
+    await connectDB();
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return NextResponse.json(
+        { error: "Email already registered" },
+        { status: 409 }
+      );
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    await User.create({
+      name,
+      email,
+      password: hashedPassword,
+    });
 
-    await db.query(
-      "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
-      [name, email, hashedPassword]
+    return NextResponse.json(
+      { message: "User created successfully" },
+      { status: 201 }
     );
-
-    return NextResponse.json({ message: "User created successfully" }, { status: 201 });
-
   } catch (error) {
     console.error("Signup error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }
